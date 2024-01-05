@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gexf version="1.2" xmlns="http://www.gexf.net/1.2draft" xmlns:viz="http:///www.gexf.net/1.1draft/viz">
+  <meta/>
+  <graph defaultedgetype="directed">
+    <attributes class="node">
+      <attribute id="type" title="type" type="string"/>
+      <attribute id="columns" title="columns" type="liststring"/>
+    </attributes>
+    <attributes class="edge">
+      <attribute id="type" title="type" type="string"/>
+      <attribute id="view" title="view" type="string"/>
+      <attribute id="columns" title="columns" type="liststring"/>
+      <attribute id="table" title="table" type="string"/>
+      <attribute id="constraint_name" title="constraint_name" type="string"/>
+      <attribute id="column_name" title="column_name" type="string"/>
+      <attribute id="foreign_column_name" title="foreign_column_name" type="string"/>
+      <attribute id="foreign_table_name" title="foreign_table_name" type="string"/>
+      <attribute id="table_name" title="table_name" type="string"/>
+    </attributes>
+    <nodes>
+      <node id="table1" label="table1">
+        <attvalues>
+          <attvalue for="type" value="table"/>
+          <attvalue for="columns" value="[object Object]|[object Object]|[object Object]"/>
+        </attvalues>
+      </node>
+      <node id="table2" label="table2">
+        <attvalues>
+          <attvalue for="type" value="table"/>
+          <attvalue for="columns" value="[object Object]|[object Object]|[object Object]"/>
+        </attvalues>
+      </node>
+      <node id="table3" label="table3">
+        <attvalues>
+          <attvalue for="type" value="table"/>
+          <attvalue for="columns" value="[object Object]|[object Object]|[object Object]"/>
+        </attvalues>
+      </node>
+      <node id="view1" label="view1">
+        <attvalues>
+          <attvalue for="type" value="view"/>
+          <attvalue for="columns" value="[object Object]|[object Object]|[object Object]"/>
+        </attvalues>
+      </node>
+      <node id="view2" label="view2">
+        <attvalues>
+          <attvalue for="type" value="view"/>
+          <attvalue for="columns" value="[object Object]|[object Object]|[object Object]"/>
+        </attvalues>
+      </node>
+      <node id="view3" label="view3">
+        <attvalues>
+          <attvalue for="type" value="view"/>
+          <attvalue for="columns" value="[object Object]|[object Object]|[object Object]"/>
+        </attvalues>
+      </node>
+    </nodes>
+    <edges>
+      <edge id="geid_80_0" source="table1" target="view1" label="table1 -> view1">
+        <attvalues>
+          <attvalue for="type" value="viewRelations"/>
+          <attvalue for="view" value="view1"/>
+          <attvalue for="columns" value="column1|column2"/>
+          <attvalue for="table" value="table1"/>
+        </attvalues>
+      </edge>
+      <edge id="geid_80_1" source="table2" target="view1" label="table2 -> view1">
+        <attvalues>
+          <attvalue for="type" value="viewRelations"/>
+          <attvalue for="view" value="view1"/>
+          <attvalue for="columns" value="column1"/>
+          <attvalue for="table" value="table2"/>
+        </attvalues>
+      </edge>
+      <edge id="geid_80_2" source="table2" target="view2" label="table2 -> view2">
+        <attvalues>
+          <attvalue for="type" value="viewRelations"/>
+          <attvalue for="view" value="view2"/>
+          <attvalue for="columns" value="column1|column2"/>
+          <attvalue for="table" value="table2"/>
+        </attvalues>
+      </edge>
+      <edge id="geid_80_3" source="view1" target="view3" label="view1 -> view3">
+        <attvalues>
+          <attvalue for="type" value="viewRelations"/>
+          <attvalue for="view" value="view3"/>
+          <attvalue for="columns" value="column1|column2"/>
+          <attvalue for="table" value="view1"/>
+        </attvalues>
+      </edge>
+      <edge id="table1_to_table2" source="table1" target="table2" label="table1_to_table2">
+        <attvalues>
+          <attvalue for="type" value="tableRelations"/>
+          <attvalue for="constraint_name" value="table1_to_table2"/>
+          <attvalue for="column_name" value="column1"/>
+          <attvalue for="foreign_column_name" value="column1"/>
+          <attvalue for="foreign_table_name" value="table1"/>
+          <attvalue for="table_name" value="table2"/>
+        </attvalues>
+      </edge>
+      <edge id="table1_to_table3" source="table1" target="table3" label="table1_to_table3">
+        <attvalues>
+          <attvalue for="type" value="tableRelations"/>
+          <attvalue for="constraint_name" value="table1_to_table3"/>
+          <attvalue for="column_name" value="column1"/>
+          <attvalue for="foreign_column_name" value="column1"/>
+          <attvalue for="foreign_table_name" value="table1"/>
+          <attvalue for="table_name" value="table3"/>
+        </attvalues>
+      </edge>
+    </edges>
+  </graph>
+</gexf>
