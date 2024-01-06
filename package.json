@@ -10,13 +10,13 @@
     "url": "https://github.com/tbui17/postgres-introspection-utilities"
   },
   "scripts": {
-    "build": "tsup index.ts --format cjs,esm --dts",
+    "build": "tsup index.ts --format cjs,esm --dts --sourcemap && tsup src/cli/cli.ts --format esm --sourcemap",
     "release": "pnpm run build && changeset publish",
     "lint": "tsc",
     "test": "vitest run"
   },
   "bin": {
-    "pg-introspection-cli": "bin/index.js"
+    "pg-introspection-cli": "dist/cli.js"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
