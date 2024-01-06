@@ -190,4 +190,3 @@ playwright/.auth
 .testGraph.gexf
 .graph.json
 pgIntrospection.config.mjs
-pgIntrospection.config.mjs
