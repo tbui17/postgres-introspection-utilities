@@ -1,7 +1,10 @@
 import _ from "lodash"
 import Graph from "graphology"
 
-import { type TableColumnsView } from "../models/tableColumnsViewSchema"
+import {
+	createDeduplicatedStore,
+	type TableColumnsView,
+} from "../models/tableColumnsViewSchema"
 import { type Relations } from "../models/relationsSchema"
 import { type ViewDependencies } from "../models/viewDependenciesSchema"
 
@@ -34,7 +37,7 @@ interface ViewRelationsEdge extends BaseNode {
 	columns: string[]
 }
 
-type RelationsDirectedGraph = Graph<
+export type RelationsDirectedGraph = Graph<
 	TableColumnsViewNode,
 	TableRelationsEdge | ViewRelationsEdge
 >
@@ -44,7 +47,7 @@ export class RelationsGraphLoader {
 
 	loadTableColumnsView(table_columns_view: TableColumnsView[]) {
 		_.chain(table_columns_view)
-			.groupBy((s) => s.table_name)
+			.thru((s) => createDeduplicatedStore(s))
 			.each((v, k) => {
 				const nodeAttributes: TableColumnsViewNode = {
 					type: "table",
@@ -59,13 +62,13 @@ export class RelationsGraphLoader {
 
 	loadViewDependencies(view_dependencies: ViewDependencies[]) {
 		view_dependencies.forEach((entry) => {
-			_.each(entry.source_tables, (columns, tableName) => {
-				this.graph.addDirectedEdge(tableName, entry.dependent_view, {
+			_.each(entry.source_tables, (columns, table) => {
+				this.graph.addDirectedEdge(table, entry.dependent_view, {
 					type: "viewRelations",
-					label: `${tableName} -> ${entry.dependent_view}`,
+					label: `${table} -> ${entry.dependent_view}`,
 					view: entry.dependent_view,
 					columns,
-					table: tableName,
+					table,
 				})
 			})
 		})
@@ -91,12 +94,8 @@ export class RelationsGraphLoader {
 	}
 
 	updateViewTypes(view_dependencies: ViewDependencies[]) {
-		view_dependencies.forEach((entry) => {
-			this.graph.updateNodeAttribute(
-				entry.dependent_view,
-				"type",
-				() => "view"
-			)
+		view_dependencies.forEach(({ dependent_view }) => {
+			this.graph.updateNodeAttribute(dependent_view, "type", () => "view")
 		})
 		return this
 	}
