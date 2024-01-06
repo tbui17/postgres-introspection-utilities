@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import SuperJSON from "superjson"
 import { Command } from "commander"
-import { DbAccessService, SqlGenerator } from "."
+import {
+	DbAccessService,
+	SqlGenerator,
+	type PgIntrospectionConfig,
+	toCypherData,
+} from "."
 import { createSqlGeneratorGraph } from "./graphConstructor/createSqlGeneratorGraph"
 import _ from "lodash"
 import fs, { writeFileSync } from "fs"
@@ -10,7 +15,8 @@ import { pathToFileURL } from "url"
 import { createDependencyGraph } from "./graphConstructor/createDependencyGraph"
 import { write } from "graphology-gexf"
 import pProps from "p-props"
-import { type SelectQueryBuilder, sql } from "kysely"
+import { type SelectQueryBuilder } from "kysely"
+import { GraphToCypherMigrator } from "@tbui17/graphology-neo4j-migrator"
 
 function toStdout(input: unknown) {
 	const result = enhancedStringify(input)
@@ -40,7 +46,7 @@ async function getConfigs() {
 	if (fs.existsSync(file)) {
 		// @ts-expect-error - dynamic import
 		const { default: config } = await import(file)
-		return config
+		return config as PgIntrospectionConfig
 	}
 
 	// eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -63,10 +69,10 @@ const sqlCompiler = (
 }
 
 export async function runCli() {
-	const p = new Command()
+	const program = new Command()
 	const config = await getConfigs()
-	const dbAccessService = DbAccessService.fromPgConfigs(config)
-	const fullSql = p.command("fullSql <input>")
+	const dbAccessService = DbAccessService.fromPgConfigs(config.pgConfig)
+	const fullSql = program.command("fullSql <input>")
 	fullSql
 		.description(
 			"Provide a table name. Generates a sql query joining all related tables and their neighbors recursively."
@@ -86,7 +92,7 @@ export async function runCli() {
 			toStdout(res)
 		})
 
-	const shortSql = p.command("shortSql [input...]")
+	const shortSql = program.command("shortSql [input...]")
 	shortSql
 		.description(
 			"Provide 2 or more table names. Generates the shortest sql query possible that joins all provided tables by finding intermediate tables that connect them."
@@ -106,7 +112,7 @@ export async function runCli() {
 
 			toStdout(res)
 		})
-	const dependencyGraph = p.command("dependencyGraph [fileLocation]")
+	const dependencyGraph = program.command("dependencyGraph [fileLocation]")
 	dependencyGraph
 		.description(
 			"Generates a gexf file containing a dependency graph of the database's tables and views in the public schema. By default, the file is saved as dependencyGraph.gexf in the current directory."
@@ -123,6 +129,47 @@ export async function runCli() {
 			writeFileSync(fileLocation, gexf, "utf8")
 			console.log(`Successfully saved graph to ${fileLocation}`)
 		})
+	const toCypherJson = program.command("toCypherJson [fileLocation]")
+	const toCypherJsonDefaultFileName = "cypherData.json"
+	toCypherJson
+		.description(
+			`Generates json files containing cypher statements and graph data for importing the database's tables and views in the public schema into Neo4j. By default, the file is saved to ${toCypherJsonDefaultFileName}`
+		)
+		.action(async (fileLocation = toCypherJsonDefaultFileName) => {
+			const { countData, cypherData } = toCypherData(
+				await dbAccessService.getAll()
+			)
+			const msg = {
+				message: `Successfully saved cypher data to ${fileLocation}`,
+				countData,
+			}
+			console.log(JSON.stringify(msg, null, 2))
+			writeFileSync(fileLocation, JSON.stringify(cypherData), "utf8")
+		})
 
-	p.parse()
+	const schemaToNeo4j = program.command("schemaToNeo4j")
+	schemaToNeo4j
+		.description(
+			`Inserts introspection data into Neo4j. Requires a config file with neo4jConfig.`
+		)
+		.action(async () => {
+			const data = await dbAccessService.getAll()
+			const graph = createDependencyGraph(
+				data.table_columns_view,
+				data.relations,
+				data.view_dependencies
+			)
+			if (!config.neo4jConfig) {
+				throw new Error("No neo4j config provided")
+			}
+
+			const migrator = new GraphToCypherMigrator({
+				graph,
+				...config.neo4jConfig,
+			})
+			const results = await migrator.run()
+			console.log(results)
+		})
+
+	program.parse()
 }

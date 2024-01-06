@@ -18,6 +18,7 @@ const config = {
 		"*.json",
 		"*.md",
 		"*.cjs",
+		"*.mjs",
 		"drizzle/**/*",
 		"drizzle.config.ts",
 		"prisma/**/*",

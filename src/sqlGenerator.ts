@@ -4,7 +4,7 @@ import {
 	type Kysely,
 } from "kysely"
 import { ratio } from "fuzzball"
-
+import { SwapBuilder } from "@tbui17/utils"
 import Graph from "graphology"
 
 import { allSimplePaths } from "graphology-simple-path"
@@ -148,23 +148,6 @@ function validate(
 	throw new Error(message)
 }
 
-class SwapBuilder<T extends Record<string, any>> {
-	private clone
-	constructor(obj: T) {
-		this.clone = { ...obj }
-	}
-
-	swap<K extends keyof T>(key1: K, key2: K) {
-		const temp = this.clone[key1]
-		this.clone[key1] = this.clone[key2]
-		this.clone[key2] = temp
-		return this
-	}
-
-	build() {
-		return this.clone
-	}
-}
 function resolveOrder(
 	node: string,
 	{ source, attributes }: InferGraphEdgeEntry<SqlGeneratorGraph>
@@ -208,6 +191,10 @@ function toJsonTree(graph: Graph) {
 			}
 			min = ctx.path.length
 			_.set(root, ctx.path, "")
+		},
+		opts: {
+			ignoreTraversalToOtherInputNodes: true,
+			neighborStrategy: "forEachNeighbor",
 		},
 	})
 
@@ -281,11 +268,12 @@ function getStats(
 }
 
 export function getShortestPath(graph: Graph, input: string[]) {
+	const inputSet = new Set(input)
 	return _.chain(graph)
 		.thru((graph) => toUndirected(graph))
 		.thru((graph) => allSimplePaths(graph, input[0]!, input[1]!))
 		.map((path) => new Set(path))
-		.filter((set) => isSubset(new Set(input), set))
+		.filter((set) => isSubset(inputSet, set))
 		.minBy((set) => set.size)
 		.tap((set) => {
 			if (!set) {

@@ -186,3 +186,8 @@ internal_scripts
 /playwright-report/
 /playwright/.cache/
 playwright/.auth
+.cypherData.json
+.testGraph.gexf
+.graph.json
+pgIntrospection.config.mjs
+pgIntrospection.config.mjs

@@ -15,7 +15,7 @@
     "lint": "tsc",
     "test": "vitest run"
   },
-  "bin":{
+  "bin": {
     "pg-introspection-cli": "bin/index.js"
   },
   "devDependencies": {
@@ -36,13 +36,15 @@
     "type-fest": "4.9.0",
     "typedoc": "^0.25.6",
     "typescript": "^5.3.3",
-    "vitest": "^1.1.1"
+    "typescript-json-schema": "^0.62.0",
+    "vitest": "^1.1.3"
   },
   "dependencies": {
     "@tbui17/graph-functions": "^0.1.0",
+    "@tbui17/graphology-neo4j-migrator": "^0.1.2",
     "@tbui17/iteration-utilities": "^2.0.2",
     "@tbui17/type-utils": "^2.1.2",
-    "@tbui17/utils": "^0.0.3",
+    "@tbui17/utils": "^0.0.6",
     "@types/lodash": "^4.14.202",
     "clipboardy": "^4.0.0",
     "commander": "^11.1.0",
@@ -58,6 +60,7 @@
     "kysely": "^0.27.1",
     "lodash": "^4.17.21",
     "mnemonist": "^0.39.7",
+    "neo4j-driver": "^5.16.0",
     "p-props": "^6.0.0",
     "pg": "^8.11.3",
     "superjson": "^2.2.1",

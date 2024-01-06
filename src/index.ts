@@ -1,3 +1,5 @@
 export * from "./cli"
+export * from "./configTypes"
 export * from "./dbAccessService"
 export * from "./sqlGenerator"
+export * from "./toCypherData"
