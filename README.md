@@ -2,7 +2,7 @@
 
 # Setup
 
-- Create a 'pgIntrospection.config.mjs' file in the root directory and export a pg.PoolConfig object like the default configs provided below.
+- Create a 'pgIntrospection.config.mjs' file in the root directory and export a config object containing settings derived from pg.PoolConfig and neo4j.Config (optional, only required for neo4j features). Import the provided type for autocomplete. See default config example below.
 
 ```javascript
 import { config as configenv } from "dotenv"
