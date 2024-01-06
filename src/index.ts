@@ -1,5 +1,6 @@
-export * from "./cli"
 export * from "./configTypes"
 export * from "./dbAccessService"
+export * from "./introspectionCli"
+export * from "./queryDependencyGraph"
 export * from "./sqlGenerator"
 export * from "./toCypherData"

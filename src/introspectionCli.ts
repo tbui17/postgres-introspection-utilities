@@ -1,11 +1,11 @@
-#!/usr/bin/env node
 import SuperJSON from "superjson"
-import { Command } from "commander"
+import { Command, Option } from "commander"
 import {
 	DbAccessService,
 	SqlGenerator,
 	type PgIntrospectionConfig,
 	toCypherData,
+	getRelatedEntities,
 } from "."
 import { createSqlGeneratorGraph } from "./graphConstructor/createSqlGeneratorGraph"
 import _ from "lodash"
@@ -18,8 +18,8 @@ import pProps from "p-props"
 import { type SelectQueryBuilder } from "kysely"
 import { GraphToCypherMigrator } from "@tbui17/graphology-neo4j-migrator"
 
-function toStdout(input: unknown) {
-	const result = enhancedStringify(input)
+function toStdout(input: unknown, space: number | undefined = undefined) {
+	const result = enhancedStringify(input, space)
 	process.stdout.write(result)
 }
 function enhancedStringify(
@@ -68,16 +68,36 @@ const sqlCompiler = (
 	return qb.compile().sql
 }
 
-export async function runCli() {
+const statOpt = new Option("-st --stats", "show stats")
+
+export async function introspectionCli() {
 	const program = new Command()
 	const config = await getConfigs()
 	const dbAccessService = DbAccessService.fromPgConfigs(config.pgConfig)
+
+	const showRelated = program.command("showRelated <input>")
+	showRelated
+		.description(
+			"Provide a table/view name. Generates a list of all tables/views related to the provided table/view."
+		)
+		.action(async (input: string) => {
+			const data = await dbAccessService.getAll()
+			const graph = createDependencyGraph(
+				data.table_columns_view,
+				data.relations,
+				data.view_dependencies
+			)
+			const res = getRelatedEntities(input, graph)
+
+			toStdout(res)
+		})
+
 	const fullSql = program.command("fullSql <input>")
 	fullSql
 		.description(
 			"Provide a table name. Generates a sql query joining all related tables and their neighbors recursively."
 		)
-		.option("-st, --stats", "show stats")
+		.addOption(statOpt)
 		.action(async (input: string) => {
 			const { relations, tableColumnsView } = await pProps({
 				relations: dbAccessService.getRelations(),
@@ -97,7 +117,7 @@ export async function runCli() {
 		.description(
 			"Provide 2 or more table names. Generates the shortest sql query possible that joins all provided tables by finding intermediate tables that connect them."
 		)
-		.option("-st, --stats", "show stats")
+		.addOption(statOpt)
 		.action(async (input: string[]) => {
 			const { relations, tableColumnsView } = await pProps({
 				relations: dbAccessService.getRelations(),
@@ -107,9 +127,30 @@ export async function runCli() {
 				dbAccessService.db,
 				createSqlGeneratorGraph(relations, tableColumnsView)
 			)
+
 			const qb = generator.generateShortestJoinQuery(input)
+
 			const res = sqlCompiler(shortSql.opts(), generator, qb)
 
+			toStdout(res)
+		})
+	const neighborSql = program
+		.command("neighborSql <input>")
+		.description(
+			"Generates a join query that gets all tables that have a direct relation to the provided table."
+		)
+		.addOption(statOpt)
+		.action(async (input: string) => {
+			const { relations, tableColumnsView } = await pProps({
+				relations: dbAccessService.getRelations(),
+				tableColumnsView: dbAccessService.getTableColumnsView(),
+			})
+			const generator = new SqlGenerator(
+				dbAccessService.db,
+				createSqlGeneratorGraph(relations, tableColumnsView)
+			)
+			const qb = generator.generateNeighborQuery(input)
+			const res = sqlCompiler(neighborSql.opts(), generator, qb)
 			toStdout(res)
 		})
 	const dependencyGraph = program.command("dependencyGraph [fileLocation]")
@@ -124,7 +165,6 @@ export async function runCli() {
 				data.relations,
 				data.view_dependencies
 			)
-			fs.writeFileSync("graph.json", JSON.stringify(graph.export()))
 			const gexf = write(graph)
 			writeFileSync(fileLocation, gexf, "utf8")
 			console.log(`Successfully saved graph to ${fileLocation}`)
@@ -173,3 +213,4 @@ export async function runCli() {
 
 	program.parse()
 }
+
