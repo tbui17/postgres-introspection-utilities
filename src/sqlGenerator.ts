@@ -1,3 +1,4 @@
+import { RelationsDirectedGraph } from "./graphConstructor/createDependencyGraph"
 import {
 	DeduplicateJoinsPlugin,
 	type SelectQueryBuilder,
@@ -37,47 +38,49 @@ export class SqlGenerator {
 		}
 
 		const pipeline = _.flow(
-			(input: string[]) => getShortestPath(this.graph, input),
+			() => getShortestPath(this.graph, input),
 			(nodes) => {
-				return slidingWindowMap(nodes, ([node1, node2]) => {
+				const res = slidingWindowMap(nodes, ([node1, node2]) => {
 					return _.flow(
 						() => this.graph.edgeEntries(node1, node2),
 						(entries) => Array.from(entries)[0],
 						(entry) => resolveOrder(node1!, entry!)
 					)()
 				})
+				return [res, res[0]!.table_name] as const
 			},
-			(edges) => {
-				return edges.reduce(
-					(
-						qb,
-						{
-							table_name,
-							foreign_table_name,
-							column_name,
-							foreign_column_name,
-						}
-					) => {
-						return qb.innerJoin(
-							foreign_table_name,
-							`${table_name}.${column_name}`,
-							`${foreign_table_name}.${foreign_column_name}`
-						)
-					},
-					this.newQuery(edges[0]!.table_name)
-				)
-			}
+			(args) => this.createJoinsFromResolvedEntry(...args)
 		)
-		return pipeline(input)
+		return pipeline()
 	}
 
-	generateJoinQuery(tableName: string) {
+	generateNeighborQuery(input: string) {
 		const graph = this.graph
 
-		const pipeline = _.flow(
-			(tableName: string) => graph.findNode((node) => node === tableName),
+		return _.flow(
+			() => graph.findNode((node) => node === input),
 			(node) => {
-				validate(graph, tableName, node)
+				validate(graph, input, node)
+				return node
+			},
+			(node) => {
+				const resolved: ReturnType<typeof resolveOrder>[] = []
+				for (const entry of graph.edgeEntries(node)) {
+					resolved.push(resolveOrder(node, entry))
+				}
+				return [resolved, node] as const
+			},
+			(args) => this.createJoinsFromResolvedEntry(...args)
+		)()
+	}
+
+	generateJoinQuery(input: string) {
+		const graph = this.graph
+
+		return _.flow(
+			() => graph.findNode((node) => node === input),
+			(node) => {
+				validate(graph, input, node)
 				return node
 			},
 			(node) => {
@@ -91,31 +94,34 @@ export class SqlGenerator {
 						})
 					},
 				})
-				return { resolved, node }
+				return [resolved, node] as const
 			},
-			({ resolved, node }) => {
-				return resolved.reduce(
-					(
-						qb,
-						{
-							foreign_table_name,
-							column_name,
-							table_name,
-							foreign_column_name,
-						}
-					) => {
-						return qb.innerJoin(
-							foreign_table_name,
-							`${table_name}.${column_name}`,
-							`${foreign_table_name}.${foreign_column_name}`
-						)
-					},
-					this.newQuery(node)
-				)
-			}
-		)
+			(args) => this.createJoinsFromResolvedEntry(...args)
+		)()
+	}
 
-		return pipeline(tableName)
+	private createJoinsFromResolvedEntry = (
+		resolved: ReturnType<typeof resolveOrder>[],
+		entity: string
+	) => {
+		return resolved.reduce(
+			(
+				qb,
+				{
+					foreign_table_name,
+					column_name,
+					table_name,
+					foreign_column_name,
+				}
+			) => {
+				return qb.innerJoin(
+					foreign_table_name,
+					`${table_name}.${column_name}`,
+					`${foreign_table_name}.${foreign_column_name}`
+				)
+			},
+			this.newQuery(entity)
+		)
 	}
 
 	getStats(qb: SelectQueryBuilder<any, any, any>) {
