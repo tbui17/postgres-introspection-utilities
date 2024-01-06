@@ -7,12 +7,13 @@ import { Kysely, PostgresDialect } from "kysely"
 import { createSqlGeneratorGraph } from "../graphConstructor/createSqlGeneratorGraph"
 import pg from "pg"
 import { allSimplePaths } from "graphology-simple-path"
+import { type TableColumnsView } from "../models/tableColumnsViewSchema"
 
-function createMockTableColumns() {
-	return _.times(10, () => {
+function createMockTableColumns(tableName: string): TableColumnsView[] {
+	return _.times(10, (i) => {
 		return {
-			table_name: faker.database.column(),
-			column_name: faker.database.type(),
+			table_name: tableName,
+			column_name: faker.database.column() + i,
 			data_type: faker.database.type(),
 		}
 	})
@@ -23,6 +24,8 @@ function createMockTableColumns() {
      \____________________________/
     
  Table6 --> Table7
+
+ Table 8
 **/
 function createRelationsData(): Relations[] {
 	const data: Omit<Relations, "table_columns" | "foreign_table_columns">[] = [
@@ -86,13 +89,23 @@ const db = new Kysely<any>({
 })
 const data = createRelationsData()
 const tables = ["table1", "table2", "table3", "table4", "table5"]
-const disconnectedTables = ["table6", "table7"]
-
+const islandTables = ["table6", "table7"]
+const soleTable = ["table8"]
+const allTables = [...tables, ...islandTables, ...soleTable]
+const tableData = allTables.flatMap(createMockTableColumns)
 describe("SqlGenerator", () => {
-	const graph = createSqlGeneratorGraph(data, createMockTableColumns())
+	const graph = createSqlGeneratorGraph(data, tableData)
 
 	const table1Edges = [...graph.outEdgeEntries("table1")]
 	const generator = new SqlGenerator(db, graph)
+
+	it("should have 8 nodes", () => {
+		expect(graph.order).toBe(8)
+	})
+
+	it("should have 6 edges", () => {
+		expect(graph.size).toBe(6)
+	})
 
 	it("1 should be able to traverse to 5 by two routes", () => {
 		const paths = allSimplePaths(graph, "table1", "table5")
@@ -112,11 +125,11 @@ describe("SqlGenerator", () => {
 			expect(table1Edges).toHaveLength(2)
 		})
 
-		it("sql string should contain tables 1-5 excluding 6-7", () => {
+		it("sql string should contain tables 1-5 excluding 6-7, 8", () => {
 			tables.forEach((table) => {
 				expect(sql).toContain(table)
 			})
-			disconnectedTables.forEach((table) => {
+			islandTables.forEach((table) => {
 				expect(sql).not.toContain(table)
 			})
 		})

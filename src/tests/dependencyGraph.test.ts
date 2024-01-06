@@ -6,8 +6,6 @@ import { faker } from "@faker-js/faker"
 import { type TableColumnsView } from "../models/tableColumnsViewSchema"
 import _ from "lodash"
 import { getGraphEdgesOfType } from "@tbui17/graph-functions/src"
-import { write } from "graphology-gexf"
-import { writeFileSync } from "fs"
 
 function createEdge<const T1 extends string, const T2 extends string>(
 	source: T1,
@@ -95,7 +93,6 @@ describe("createDependencyGraph", () => {
 	it("should have 2 table relations and 4 view relations", () => {
 		expect(tableRelations).toHaveLength(2)
 		expect(viewRelations).toHaveLength(4)
-		writeFileSync("graph.json", JSON.stringify(graph.export()))
 	})
 
 	it("should have table relation 1 -> 2 and 1 -> 3", () => {
@@ -112,8 +109,7 @@ describe("createDependencyGraph", () => {
 				edge.source === "table1" &&
 				edge.target === "table3"
 		)
-		const gexf = write(graph)
-		writeFileSync("testGraph.gexf", gexf, "utf8")
+
 		expect(table2Edge).toBeDefined()
 	})
 	it("should have table-view relation table1 -> view1 and view-view relation 1 -> 3 ", () => {
