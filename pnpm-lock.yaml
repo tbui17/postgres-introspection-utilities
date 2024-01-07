@@ -44,12 +44,12 @@ dependencies:
   graphology-operators:
     specifier: ^1.6.0
     version: 1.6.0(graphology-types@0.24.7)
+  graphology-shortest-path:
+    specifier: ^2.0.2
+    version: 2.0.2(graphology-types@0.24.7)
   graphology-simple-path:
     specifier: ^0.2.0
     version: 0.2.0(graphology-types@0.24.7)
-  graphology-types:
-    specifier: ^0.24.7
-    version: 0.24.7
   graphology-utils:
     specifier: ^2.5.2
     version: 2.5.2(graphology-types@0.24.7)
@@ -112,6 +112,9 @@ devDependencies:
   eslint-plugin-unused-imports:
     specifier: ^3.0.0
     version: 3.0.0(@typescript-eslint/eslint-plugin@6.17.0)(eslint@8.56.0)
+  graphology-types:
+    specifier: ^0.24.7
+    version: 0.24.7
   prettier:
     specifier: ^3.1.1
     version: 3.1.1
@@ -1200,6 +1203,10 @@ packages:
   /@xmldom/xmldom@0.8.10:
     resolution: {integrity: sha512-2WALfTl4xo2SkGCYRt6rDTFfk9R1czmBvUQy12gK2KuRKIpWEhcbbzy8EZXtz/jkRqHX8bFEc6FC1HjX4TUWYw==}
     engines: {node: '>=10.0.0'}
+    dev: false
+
+  /@yomguithereal/helpers@1.1.1:
+    resolution: {integrity: sha512-UYvAq/XCA7xoh1juWDYsq3W0WywOB+pz8cgVnE1b45ZfdMhBvHDrgmSFG3jXeZSr2tMTYLGHFHON+ekG05Jebg==}
     dev: false
 
   /acorn-jsx@5.3.2(acorn@8.11.3):
@@ -2352,6 +2359,16 @@ packages:
       xml-writer: 1.7.0
     dev: false
 
+  /graphology-indices@0.17.0(graphology-types@0.24.7):
+    resolution: {integrity: sha512-A7RXuKQvdqSWOpn7ZVQo4S33O0vCfPBnUSf7FwE0zNCasqwZVUaCXePuWo5HBpWw68KJcwObZDHpFk6HKH6MYQ==}
+    peerDependencies:
+      graphology-types: '>=0.20.0'
+    dependencies:
+      graphology-types: 0.24.7
+      graphology-utils: 2.5.2(graphology-types@0.24.7)
+      mnemonist: 0.39.7
+    dev: false
+
   /graphology-neo4j@1.2.0(graphology@0.25.4)(neo4j-driver@5.16.0):
     resolution: {integrity: sha512-3UDc8eROBhAMpFAiK3yqCA45HadrwWAAESp7H00YDAlIEreHTabEmpdnjdA2Ct8riUKJeOKtyxLedbNttGf9dQ==}
     peerDependencies:
@@ -2371,6 +2388,18 @@ packages:
       graphology-utils: 2.5.2(graphology-types@0.24.7)
     dev: false
 
+  /graphology-shortest-path@2.0.2(graphology-types@0.24.7):
+    resolution: {integrity: sha512-hlGvh4Yb1Vmd2J7wT8Q8+t4RQ6Tx+9wRYm0/fZB9PZJ4uW3nml5kJ7yXZ2+JYWT+7wLLmY5mg3o9bLSAWmv/jQ==}
+    peerDependencies:
+      graphology-types: '>=0.20.0'
+    dependencies:
+      '@yomguithereal/helpers': 1.1.1
+      graphology-indices: 0.17.0(graphology-types@0.24.7)
+      graphology-types: 0.24.7
+      graphology-utils: 2.5.2(graphology-types@0.24.7)
+      mnemonist: 0.39.7
+    dev: false
+
   /graphology-simple-path@0.2.0(graphology-types@0.24.7):
     resolution: {integrity: sha512-4cGMWbVuJM0zlKDUx6dS6JGGLddizDPe8PsTokXVz2eTeHYg07qa5TgwIco15ta2RMM05+xy8N1mFnpS85y0kw==}
     peerDependencies:
@@ -2383,7 +2412,6 @@ packages:
 
   /graphology-types@0.24.7:
     resolution: {integrity: sha512-tdcqOOpwArNjEr0gNQKCXwaNCWnQJrog14nJNQPeemcLnXQUUGrsCWpWkVKt46zLjcS6/KGoayeJfHHyPDlvwA==}
-    dev: false
 
   /graphology-utils@1.8.0(graphology-types@0.24.7):
     resolution: {integrity: sha512-Pa7SW30OMm8fVtyH49b3GJ/uxlMHGfXly50wIhlcc7ZoX9ahZa7sPBz+obo4WZClrRV6wh3tIu0GJoI42eao1A==}

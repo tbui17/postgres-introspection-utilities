@@ -115,7 +115,7 @@ export async function introspectionCli() {
 	const shortSql = program.command("shortSql [input...]")
 	shortSql
 		.description(
-			"Provide 2 or more table names. Generates the shortest sql query possible that joins all provided tables by finding intermediate tables that connect them."
+			"Provide 2 or more table names. Generates the shortest sql query possible that joins all provided tables by finding intermediate tables that connect them. Command performance decreases significantly with the amount of tables provided."
 		)
 		.addOption(statOpt)
 		.action(async (input: string[]) => {

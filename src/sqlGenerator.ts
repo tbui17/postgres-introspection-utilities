@@ -1,4 +1,3 @@
-import { RelationsDirectedGraph } from "./graphConstructor/createDependencyGraph"
 import {
 	DeduplicateJoinsPlugin,
 	type SelectQueryBuilder,
@@ -7,11 +6,6 @@ import {
 import { ratio } from "fuzzball"
 import { SwapBuilder } from "@tbui17/utils"
 import Graph from "graphology"
-
-import { allSimplePaths } from "graphology-simple-path"
-import { isSubset } from "mnemonist/set"
-import { toUndirected } from "graphology-operators"
-
 import _ from "lodash"
 import { bfsGraph, type InferGraphEdgeEntry } from "@tbui17/graph-functions/src"
 
@@ -23,6 +17,8 @@ import { type SqlGeneratorGraph } from "./graphConstructor/createSqlGeneratorGra
 import { hasCycle } from "graphology-dag"
 import { inferType } from "graphology-utils"
 import { type JsonValue } from "type-fest"
+import { bidirectional } from "graphology-shortest-path"
+import { steinerSubgraph } from "."
 
 export class SqlGenerator {
 	constructor(
@@ -30,74 +26,88 @@ export class SqlGenerator {
 		private graph: SqlGeneratorGraph
 	) {}
 
-	generateShortestJoinQuery(input: string[]) {
+	generateShortestJoinQuery(input: string[], graph = this.graph) {
+		const res = this.generateShortestJoinQueryHelper(input, graph)
+		if (res.type === "twoNode") {
+			return this.createJoinsFromResolvedEntry(res.resolved, res.node)
+		}
+
+		return this.generateJoinQuery(res.node, res.graph)
+	}
+
+	generateShortestJoinQueryHelper(input: string[], graph = this.graph) {
 		if (input.length < 2) {
 			throw new Error(
 				"There must be at least 2 nodes in the provided array."
 			)
 		}
 
-		const pipeline = _.flow(
-			() => getShortestPath(this.graph, input),
-			(nodes) => {
-				const res = slidingWindowMap(nodes, ([node1, node2]) => {
-					return _.flow(
-						() => this.graph.edgeEntries(node1, node2),
-						(entries) => Array.from(entries)[0],
-						(entry) => resolveOrder(node1!, entry!)
-					)()
-				})
-				return [res, res[0]!.table_name] as const
-			},
-			(args) => this.createJoinsFromResolvedEntry(...args)
+		if (input.length === 2) {
+			const nodes = twoNodeShortestPath(graph, input[0]!, input[1]!)
+
+			const res = slidingWindowMap(nodes, ([node1, node2]) => {
+				const res = [...graph.edgeEntries(node1, node2)][0]!
+				return resolveOrder(node1!, res)
+			})
+			return {
+				type: "twoNode",
+				resolved: res,
+				node: res[0]!.table_name,
+			} as const
+		}
+
+		return {
+			type: "multiNode",
+			graph: steinerSubgraph(graph, input) as typeof graph,
+			node: input[0]!,
+		} as const
+	}
+
+	generateNeighborQuery(input: string, graph = this.graph) {
+		const { resolved, node } = this.generateNeighborQueryHelper(
+			input,
+			graph
 		)
-		return pipeline()
+
+		return this.createJoinsFromResolvedEntry(resolved, node)
 	}
 
-	generateNeighborQuery(input: string) {
-		const graph = this.graph
+	generateNeighborQueryHelper(input: string, graph = this.graph) {
+		const node = graph.findNode((node) => node === input)
+		validate(graph, input, node)
 
-		return _.flow(
-			() => graph.findNode((node) => node === input),
-			(node) => {
-				validate(graph, input, node)
-				return node
-			},
-			(node) => {
-				const resolved: ReturnType<typeof resolveOrder>[] = []
-				for (const entry of graph.edgeEntries(node)) {
-					resolved.push(resolveOrder(node, entry))
-				}
-				return [resolved, node] as const
-			},
-			(args) => this.createJoinsFromResolvedEntry(...args)
-		)()
+		const resolved: ReturnType<typeof resolveOrder>[] = []
+		for (const entry of graph.edgeEntries(node)) {
+			resolved.push(resolveOrder(node, entry))
+		}
+		return {
+			resolved,
+			node,
+		}
 	}
 
-	generateJoinQuery(input: string) {
-		const graph = this.graph
+	generateJoinQuery(input: string, graph = this.graph) {
+		const { resolved, node } = this.generateJoinQueryHelper(input, graph)
+		return this.createJoinsFromResolvedEntry(resolved, node)
+	}
 
-		return _.flow(
-			() => graph.findNode((node) => node === input),
-			(node) => {
-				validate(graph, input, node)
-				return node
-			},
-			(node) => {
-				const resolved: ReturnType<typeof resolveOrder>[] = []
-				bfsGraph({
-					graph,
-					nodes: node,
-					fn(ctx) {
-						ctx.forEachEdgeEntry((entry) => {
-							resolved.push(resolveOrder(ctx.source, entry))
-						})
-					},
+	generateJoinQueryHelper(input: string, graph = this.graph) {
+		const node = graph.findNode((node) => node === input)
+		validate(graph, input, node)
+		const resolved: ReturnType<typeof resolveOrder>[] = []
+		bfsGraph({
+			graph,
+			nodes: node,
+			fn(ctx) {
+				ctx.forEachEdgeEntry((entry) => {
+					resolved.push(resolveOrder(ctx.source, entry))
 				})
-				return [resolved, node] as const
 			},
-			(args) => this.createJoinsFromResolvedEntry(...args)
-		)()
+		})
+		return {
+			resolved,
+			node,
+		}
 	}
 
 	private createJoinsFromResolvedEntry = (
@@ -124,9 +134,9 @@ export class SqlGenerator {
 		)
 	}
 
-	getStats(qb: SelectQueryBuilder<any, any, any>) {
+	getStats(qb: SelectQueryBuilder<any, any, any>, graph = this.graph) {
 		const tableNames = getTableNames(qb)
-		const isCycle = hasCycle(this.graph)
+		const isCycle = hasCycle(graph)
 		return getStats(tableNames, isCycle)
 	}
 
@@ -154,9 +164,14 @@ function validate(
 	throw new Error(message)
 }
 
-function resolveOrder(
+type ResolveOrderArgs = {
+	source: InferGraphEdgeEntry<SqlGeneratorGraph>["source"]
+	attributes: InferGraphEdgeEntry<SqlGeneratorGraph>["attributes"]
+}
+
+export function resolveOrder(
 	node: string,
-	{ source, attributes }: InferGraphEdgeEntry<SqlGeneratorGraph>
+	{ source, attributes }: ResolveOrderArgs
 ) {
 	return source === node
 		? attributes
@@ -273,21 +288,16 @@ function getStats(
 	}
 }
 
-export function getShortestPath(graph: Graph, input: string[]) {
-	const inputSet = new Set(input)
-	return _.chain(graph)
-		.thru((graph) => toUndirected(graph))
-		.thru((graph) => allSimplePaths(graph, input[0]!, input[1]!))
-		.map((path) => new Set(path))
-		.filter((set) => isSubset(inputSet, set))
-		.minBy((set) => set.size)
-		.tap((set) => {
-			if (!set) {
-				throw new Error("No possible joins found.")
-			}
-		})
-		.thru((set) => Array.from(set))
-		.value()
+export function twoNodeShortestPath(
+	graph: Graph,
+	node1: string,
+	node2: string
+) {
+	const path = bidirectional(graph, node1, node2)
+	if (!path) {
+		throw new Error("No possible joins found.")
+	}
+	return path
 }
 
 type Query = {

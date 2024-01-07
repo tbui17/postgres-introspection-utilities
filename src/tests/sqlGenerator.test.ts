@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import { type Relations } from "../models/relationsSchema"
 import { faker } from "@faker-js/faker"
 import _ from "lodash"
-import { SqlGenerator, getShortestPath } from ".."
-import { Kysely, PostgresDialect } from "kysely"
+import { SqlGenerator, resolveOrder } from ".."
+import { Kysely, PostgresDialect, type SelectQueryBuilder } from "kysely"
 import { createSqlGeneratorGraph } from "../graphConstructor/createSqlGeneratorGraph"
 import pg from "pg"
 import { allSimplePaths } from "graphology-simple-path"
@@ -93,6 +93,7 @@ const islandTables = ["table6", "table7"]
 const soleTable = ["table8"]
 const allTables = [...tables, ...islandTables, ...soleTable]
 const tableData = allTables.flatMap(createMockTableColumns)
+
 describe("SqlGenerator", () => {
 	const graph = createSqlGeneratorGraph(data, tableData)
 
@@ -121,6 +122,11 @@ describe("SqlGenerator", () => {
 		const qb = generator.generateJoinQuery("table1")
 		const sql = qb.compile().sql
 
+		it("core functionality", () => {
+			const res = generator.generateJoinQueryHelper("table1")
+			expect(tables.includes(res.node)).toBe(true)
+		})
+
 		it("table1 should have 2 out edges in graph", () => {
 			expect(table1Edges).toHaveLength(2)
 		})
@@ -147,26 +153,68 @@ describe("SqlGenerator", () => {
 	})
 
 	describe("generateShortestJoinQuery", () => {
-		const qb = generator.generateShortestJoinQuery(["table1", "table5"])
-		const sql = qb.compile().sql
+		it("core functionality steiner subgraph", () => {
+			const graph = createSqlGeneratorGraph(data, tableData)
+			const inp = ["table1", "table3", "table5"]
+
+			const res = new SqlGenerator(
+				db,
+				graph
+			).generateShortestJoinQueryHelper(inp, graph)
+
+			if (res.type === "twoNode") {
+				throw new Error("should not be two node")
+			}
+			expect(res.graph.nodes()).toEqual(
+				expect.arrayContaining(["table1", "table3", "table4", "table5"])
+			)
+		})
+
+		it("core functionality bidirectional shortest", () => {
+			const graph = createSqlGeneratorGraph(data, tableData)
+			const inp = ["table1", "table5"]
+
+			const res = new SqlGenerator(
+				db,
+				graph
+			).generateShortestJoinQueryHelper(inp, graph)
+
+			if (res.type === "multiNode") {
+				throw new Error("should not be multiNode")
+			}
+			const expected = [
+				{
+					constraint_name: "table1_to_table4",
+					table_name: "table1",
+					column_name: "id",
+					foreign_table_name: "table4",
+					foreign_column_name: "id",
+				},
+				{
+					constraint_name: "table4_to_table5",
+					table_name: "table4",
+					column_name: "id",
+					foreign_table_name: "table5",
+					foreign_column_name: "id",
+				},
+			]
+			expect(res.resolved).toEqual(expect.arrayContaining(expected))
+		})
+
 		it("should include tables 1, 4, 5 in sql", () => {
+			const qb = generator.generateShortestJoinQuery(["table1", "table5"])
+			const sql = qb.compile().sql
 			expect(sql).toContain("table1")
 			expect(sql).toContain("table4")
 			expect(sql).toContain("table5")
 		})
 
 		it("basic functionality test", () => {
+			const qb = generator.generateShortestJoinQuery(["table1", "table5"])
 			const sql = qb.compile().sql
 			expect(sql).toBe(
 				`select * from "table1" inner join "table4" on "table1"."id" = "table4"."id" inner join "table5" on "table4"."id" = "table5"."id"`
 			)
-		})
-	})
-
-	describe("getShortestPath", () => {
-		const path = getShortestPath(graph, ["table1", "table5"])
-		it("should favor 1 -> 4 -> 5 over 1 -> 2 -> 3 -> 4 -> 5", () => {
-			expect(path).toEqual(["table1", "table4", "table5"])
 		})
 	})
 
@@ -192,5 +240,25 @@ describe("SqlGenerator", () => {
 				}
 			)
 		})
+	})
+})
+
+it("should realign edge attributes such that the foreign name and attributes belong to the opposing node when the edge's source node does not match the noed provided in the args", () => {
+	const res = resolveOrder("table1", {
+		source: "table2",
+		attributes: {
+			column_name: "id2",
+			constraint_name: expect.any(String),
+			foreign_column_name: "id",
+			foreign_table_name: "table",
+			table_name: "table2",
+		},
+	})
+	expect(res).toEqual({
+		column_name: "id",
+		constraint_name: expect.any(String),
+		foreign_column_name: "id2",
+		foreign_table_name: "table2",
+		table_name: "table",
 	})
 })

@@ -57,11 +57,3 @@ Commands:
   schemaToNeo4j                   Inserts introspection data into Neo4j. Requires a config file with neo4jConfig.
   help [command]                  display help for command
 ```
-
-# Programmatic use
-
-- The library uses the following as its core:
-  - DbAccessService: Retrieves table and view metadata from the database. Modify the queryStore property to change the SQL queries used. Override the methods to change how SQL is executed.
-  - createDependencyGraph: Creates a dependency graph of the database's tables and views in the public schema along with their relations.
-  - createSqlGeneratorGraph: Creates a graph of the database's tables and views that is used in the SqlGenerator class.
-  - SqlGenerator: Provides core functionality for traversing the graph and generating an intermediate SQL builder (Kysely) which can be compiled.
