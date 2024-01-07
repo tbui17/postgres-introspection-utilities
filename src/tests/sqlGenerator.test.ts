@@ -153,7 +153,7 @@ describe("SqlGenerator", () => {
 	})
 
 	describe("generateShortestJoinQuery", () => {
-		it.only("core functionality steiner subgraph", () => {
+		it("core functionality steiner subgraph", () => {
 			const graph = createSqlGeneratorGraph(data, tableData)
 			const inp = ["table1", "table3", "table5"]
 
