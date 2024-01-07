@@ -1,17 +1,9 @@
 import { toUndirected } from "graphology-operators"
-import {
-	bfsGraph,
-	mapCallbackParametersToEdgeEntry,
-} from "@tbui17/graph-functions/src"
+import { mapCallbackParametersToEdgeEntry } from "@tbui17/graph-functions/src"
 import { allPairsEach } from "@tbui17/iteration-utilities"
 import Graph from "graphology"
 import { bidirectional } from "graphology-shortest-path"
 import { type NodeEntry, type EdgeEntry } from "graphology-types"
-
-type GraphChange = {
-	node: string
-	edges: EdgeEntry[]
-}
 
 /**
  * Assumes provided graph is an unweighted DAG.
@@ -21,110 +13,51 @@ type GraphChange = {
 export function steinerSubgraph(graph: Graph, nodes: string[]) {
 	const undirectedGraph = toUndirected(graph)
 	const subgraph = new Graph()
-	const [f, ...rest] = nodes
-	const keyNodeSet = new Set(nodes)
-	const first = f!
-	mergeKeyNodeComponent(nodes, undirectedGraph, subgraph)
-	const notInKeyNodeSet = subgraph.filterNodes(
-		(node) => !keyNodeSet.has(node)
-	)
-	dropExtraneousNodes(notInKeyNodeSet, subgraph, rest, first)
+	mergeKeyNodeComponentIntoSubgraph(nodes, undirectedGraph, subgraph)
 	return subgraph
 }
-function dropExtraneousNodes(
-	notInKeyNodeSet: string[],
-	subgraph: Graph,
-	rest: string[],
-	first: string
-) {
-	for (const node of notInKeyNodeSet) {
-		const change: GraphChange = {
-			node,
-			edges: [...subgraph.edgeEntries(node)],
-		}
-		subgraph.dropNode(node)
-		if (keyNodesAreConnected(subgraph, rest, first)) {
-			continue
-		}
 
-		undo(subgraph, node, change)
+class ItemMap<T> {
+	private map = new Map<string, T>()
+
+	constructor(public selector: (item: T) => string) {}
+
+	get data() {
+		return Array.from(this.map.values())
+	}
+
+	add(item: T) {
+		const res = this.selector(item)
+		if (this.map.has(res)) {
+			return this
+		}
+		this.map.set(res, item)
+
+		return this
+	}
+	addDelayed(key: string, fn: () => T) {
+		if (this.map.has(key)) {
+			return this
+		}
+		this.add(fn())
+		return this
+	}
+
+	has(item: T) {
+		return this.map.has(this.selector(item))
+	}
+
+	hasKey(key: string) {
+		return this.map.has(key)
 	}
 }
 
-function keyNodesAreConnected(graph: Graph, rest: string[], first: string) {
-	return rest.every((node) => canReach(graph, node, first))
-}
-
-function canReach(graph: Graph, node: string, target: string) {
-	return bfsGraph({
-		graph,
-		nodes: node,
-		fn(ctx) {
-			if (ctx.target === target) {
-				return true
-			}
-		},
-	})
-}
-
-function undo(subgraph: Graph, node: string, change: GraphChange) {
-	subgraph.addNode(node)
-	for (const edge of change.edges) {
-		subgraph.addEdgeWithKey(
-			edge.edge,
-			edge.source,
-			edge.target,
-			edge.attributes
-		)
-	}
-}
-
-function mergeKeyNodeComponent(
-	nodeInput: string[],
+function mergeKeyNodeComponentIntoSubgraph(
+	keyNodes: string[],
 	graph: Graph,
 	subgraph: Graph
 ) {
-	function dataPrep() {
-		const seenNodes = new Set<string>()
-		const seenEdges = new Set<string>()
-		const nodes: NodeEntry[] = []
-		const edges: EdgeEntry[] = []
-		allPairsEach(nodeInput, (a, b) => {
-			const path = bidirectional(graph, a, b)
-			if (!path) {
-				throw new Error("No joins possible")
-			}
-
-			allPairsEach(path, (a, b) => {
-				if (!seenNodes.has(a)) {
-					const attr = graph.getNodeAttributes(a)
-					nodes.push({
-						node: a,
-						attributes: attr,
-					})
-					seenNodes.add(a)
-				}
-				if (!seenNodes.has(b)) {
-					const attr = graph.getNodeAttributes(b)
-					nodes.push({
-						node: b,
-						attributes: attr,
-					})
-					seenNodes.add(b)
-				}
-
-				graph.forEachEdge(a, b, (...args) => {
-					const edge = mapCallbackParametersToEdgeEntry(args)
-					if (!seenEdges.has(edge.edge)) {
-						seenEdges.add(edge.edge)
-						edges.push(edge)
-					}
-				})
-			})
-		})
-		return { nodes, edges }
-	}
-	const { nodes, edges } = dataPrep()
+	const { nodes, edges } = prepareSubgraphData(graph, keyNodes)
 	nodes.forEach((node) => {
 		subgraph.addNode(node.node, node.attributes)
 	})
@@ -136,4 +69,51 @@ function mergeKeyNodeComponent(
 			edge.attributes
 		)
 	})
+}
+
+class SteinerSubgraphError extends Error {
+	constructor(nodeA: string, nodeB: string, nodeInput: string[]) {
+		const msg = {
+			message: `Provided nodes are not connected.`,
+			nodeA,
+			nodeB,
+			nodeInput,
+		}
+		const message = JSON.stringify(msg)
+		super(message)
+		this.name = "SteinerSubgraphError"
+	}
+}
+
+function prepareSubgraphData(graph: Graph, nodeInput: string[]) {
+	const nodeCollection = new ItemMap<NodeEntry>((node) => node.node)
+	const edgeCollection = new ItemMap<EdgeEntry>((edge) => edge.edge)
+	const nodeCollectionAdder = (node: string) => {
+		nodeCollection.add({
+			node,
+			attributes: graph.getNodeAttributes(node),
+		})
+	}
+	const shortestPathAdder = (path: string[]) => {
+		allPairsEach(path, (nodeA2, nodeB2) => {
+			nodeCollectionAdder(nodeA2)
+			nodeCollectionAdder(nodeB2)
+			graph.forEachEdge(nodeA2, nodeB2, (...args) => {
+				const edge = mapCallbackParametersToEdgeEntry(args)
+				edgeCollection.add(edge)
+			})
+		})
+	}
+
+	allPairsEach(nodeInput, (nodeA, nodeB) => {
+		const path = bidirectional(graph, nodeA, nodeB)
+		if (!path) {
+			throw new SteinerSubgraphError(nodeA, nodeB, nodeInput)
+		}
+		shortestPathAdder(path)
+	})
+	return {
+		nodes: nodeCollection.data,
+		edges: edgeCollection.data,
+	}
 }
