@@ -8,7 +8,7 @@ import { type NodeEntry, type EdgeEntry } from "graphology-types"
 /**
  * Assumes provided graph is an unweighted DAG.
  *
- * Retrieves smallest subgraph containing all specified nodes.
+ * Retrieves smallest subgraph containing all specified nodes. The copy is returned as an unweighted undirected graph.
  */
 export function steinerSubgraph(graph: Graph, nodes: string[]) {
 	const undirectedGraph = toUndirected(graph)
