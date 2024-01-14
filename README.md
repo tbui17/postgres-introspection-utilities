@@ -9,7 +9,7 @@ import { config as configenv } from "dotenv"
 configenv()
 
 /**
- * @type {import("@tbui17/postgres-introspection-utilities").PgIntrospectionConfig}
+ * @type {import("@tbui17/neo4j-postgres-introspection-utilities").PgIntrospectionConfig}
  */
 const config = {
 	pgConfig: {
@@ -36,9 +36,15 @@ const config = {
 }
 export default config
 
-```
 
-- Use 'pg-introspection-cli' as the entry point to the CLI.
+```
+# Workaround for ESM
+- Create a script file such as "cli.ts" in the root directory and add the following.
+```typescript
+import { introspectionCli } from "@tbui17/postgres-introspection-utilities/src/introspectionCli"
+introspectionCli()
+```
+- Run npm/yarn/pnpm tsx or install it globally and point it at the script file. You may add this to your package json scripts if you wish.
 
 # Usage
 ```
