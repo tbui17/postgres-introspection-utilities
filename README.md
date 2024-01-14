@@ -9,7 +9,7 @@ import { config as configenv } from "dotenv"
 configenv()
 
 /**
- * @type {import("@tbui17/neo4j-postgres-introspection-utilities").PgIntrospectionConfig}
+ * @type {import("@tbui17/postgres-introspection-utilities").PgIntrospectionConfig}
  */
 const config = {
 	pgConfig: {
